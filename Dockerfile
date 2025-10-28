@@ -4,7 +4,7 @@ WORKDIR /app
 
 COPY package*.json ./
 
-# If there's no package-lock.json, just run npm install
+# Pass-through for missing lockfile
 ARG NO_LOCKFILE=false
 RUN if [ "$NO_LOCKFILE" = "true" ]; then npm install; else npm ci; fi
 
@@ -16,6 +16,8 @@ FROM node:20-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 
+# Must redeclare the ARG for this stage
+ARG NO_LOCKFILE=false
 COPY package*.json ./
 RUN if [ "$NO_LOCKFILE" = "true" ]; then npm install --omit=dev; else npm ci --only=production; fi
 
