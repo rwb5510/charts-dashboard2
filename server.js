@@ -15,6 +15,11 @@ app.use(express.static(PUBLIC_DIRECTORY));
 
 let db;
 
+/**
+ * Initialises the database by creating the data directory if it doesn't exist,
+ * opening the database connection, and creating the necessary tables.
+ * @returns {Promise<void>} A promise that resolves when the database is initialised.
+ */
 async function initialiseDatabase() {
     if (!fs.existsSync(DATA_DIRECTORY)) {
         fs.mkdirSync(DATA_DIRECTORY, { recursive: true });
@@ -40,6 +45,10 @@ async function initialiseDatabase() {
     `);
 }
 
+/**
+ * Loads the application state from the database.
+ * @returns {Promise<object>} A promise that resolves with the application state.
+ */
 async function loadState() {
     const patientRows = await db.all('SELECT dos, data FROM patient_lists ORDER BY dos');
     const settingsRows = await db.all('SELECT name, values_json FROM settings');
@@ -72,6 +81,15 @@ async function loadState() {
     };
 }
 
+/**
+ * Persists the application state to the database.
+ * @param {object} state - The application state to persist.
+ * @param {object} state.patientLists - A dictionary of patient lists, keyed by date of service.
+ * @param {string[]} state.reasonTags - A list of reason tags.
+ * @param {string[]} state.resultsNeededTags - A list of results needed tags.
+ * @param {string[]} state.visitTypeTags - A list of visit type tags.
+ * @returns {Promise<void>} A promise that resolves when the state has been persisted.
+ */
 async function persistState({ patientLists, reasonTags, resultsNeededTags, visitTypeTags }) {
     if (typeof patientLists !== 'object' || patientLists === null || Array.isArray(patientLists)) {
         throw new Error('Invalid patientLists payload');
@@ -106,6 +124,15 @@ async function persistState({ patientLists, reasonTags, resultsNeededTags, visit
     }
 }
 
+/**
+ * Route to get the current application state.
+ * @name GET /api/state
+ * @function
+ * @memberof module:server
+ * @inner
+ * @param {object} req - Express request object.
+ * @param {object} res - Express response object.
+ */
 app.get('/api/state', async (req, res) => {
     try {
         const state = await loadState();
@@ -116,6 +143,15 @@ app.get('/api/state', async (req, res) => {
     }
 });
 
+/**
+ * Route to save the application state.
+ * @name POST /api/state
+ * @function
+ * @memberof module:server
+ * @inner
+ * @param {object} req - Express request object.
+ * @param {object} res - Express response object.
+ */
 app.post('/api/state', async (req, res) => {
     try {
         await persistState(req.body || {});
@@ -127,6 +163,16 @@ app.post('/api/state', async (req, res) => {
     }
 });
 
+/**
+ * Catch-all route to serve the main index.html file for any non-API routes.
+ * @name GET *
+ * @function
+ * @memberof module:server
+ * @inner
+ * @param {object} req - Express request object.
+ * @param {object} res - Express response object.
+ * @param {function} next - Express next middleware function.
+ */
 app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api/')) {
         return next();
