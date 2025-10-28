@@ -3,66 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Charts Task List Generator</title>
+  <title>Charts Task List Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
-
-  <style>
-    html, body { overflow-x: hidden; }
-    .hidden-column { display: none !important; }
-
-    /* Floating column gear menu */
-    .column-menu {
-      position: absolute;
-      top: 2.5rem;
-      right: 1rem;
-      z-index: 50;
-      background: white;
-      border: 1px solid #ddd;
-      border-radius: 0.5rem;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-      padding: 0.75rem;
-      width: 220px;
-      display: none;
-    }
-
-    .column-menu label {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.25rem 0;
-      font-size: 0.9rem;
-    }
-
-    /* Mobile card view */
-    @media (max-width: 768px) {
-      table, thead, tbody, th, td, tr { display: block; }
-      thead { display: none; }
-      tr {
-        background: white;
-        margin-bottom: 1rem;
-        border: 1px solid #e5e7eb;
-        border-radius: 0.5rem;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        padding: 0.75rem;
-      }
-      td {
-        display: flex;
-        justify-content: space-between;
-        padding: 0.5rem;
-        border: none;
-        border-bottom: 1px solid #f3f4f6;
-      }
-      td::before {
-        content: attr(data-label);
-        font-weight: 600;
-        color: #374151;
-      }
-      td:last-child { border-bottom: none; }
-    }
-  </style>
 </head>
 
 <body class="bg-gray-50 text-gray-800">
@@ -91,10 +36,10 @@
       </button>
     </div>
 
-    <!-- Data area -->
+    <!-- Data Display Area -->
     <div id="data-display-area" class="mt-8 relative space-y-6 overflow-x-auto"></div>
 
-    <!-- Modals and Notifications -->
+    <!-- Modal: Date of Service -->
     <div id="dos-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
       <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
         <div class="mt-3 text-center">
@@ -113,6 +58,7 @@
 
     <div id="notification-container" class="fixed bottom-5 right-5 z-50"></div>
 
+    <!-- Modal: PDF Viewer -->
     <div id="pdf-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-[100]">
       <div id="pdf-modal-content" class="relative top-10 mx-auto p-5 border w-11/12 h-[90vh] shadow-lg rounded-md bg-white flex flex-col">
         <div class="flex justify-between items-center pb-3 border-b">
@@ -125,63 +71,6 @@
       </div>
     </div>
   </div>
-
-  <script>
-    // --- Gear Menu Logic (applies to any table dynamically created) ---
-    function addGearMenuToTable(table) {
-      const wrapper = document.createElement('div');
-      wrapper.className = 'relative';
-      const menu = document.createElement('div');
-      menu.className = 'column-menu';
-      const gear = document.createElement('button');
-      gear.innerHTML = '⚙️';
-      gear.className = 'absolute top-[-2.5rem] right-0 text-gray-600 hover:text-blue-600 text-lg';
-      wrapper.appendChild(gear);
-      wrapper.appendChild(table);
-      wrapper.appendChild(menu);
-      table.parentNode.insertBefore(wrapper, table);
-
-      gear.addEventListener('click', () => {
-        menu.innerHTML = '';
-        const headers = table.querySelectorAll('th');
-        headers.forEach((th, i) => {
-          const label = document.createElement('label');
-          const cb = document.createElement('input');
-          cb.type = 'checkbox';
-          cb.checked = !th.classList.contains('hidden-column');
-          cb.addEventListener('change', () => toggleColumn(table, i));
-          label.append(cb, th.textContent);
-          menu.append(label);
-        });
-        menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
-      });
-
-      document.addEventListener('click', (e) => {
-        if (!gear.contains(e.target) && !menu.contains(e.target)) {
-          menu.style.display = 'none';
-        }
-      });
-    }
-
-    function toggleColumn(table, i) {
-      table.querySelectorAll('tr').forEach(tr => {
-        const cell = tr.children[i];
-        if (cell) cell.classList.toggle('hidden-column');
-      });
-    }
-
-    // Attach to existing or future tables
-    const observer = new MutationObserver(() => {
-      document.querySelectorAll('#data-display-area table').forEach(table => {
-        if (!table.dataset.hasGear) {
-          addGearMenuToTable(table);
-          table.dataset.hasGear = true;
-        }
-      });
-    });
-
-    observer.observe(document.getElementById('data-display-area'), { childList: true, subtree: true });
-  </script>
 
   <script src="script.js"></script>
 </body>
