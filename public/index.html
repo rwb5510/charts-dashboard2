@@ -139,4 +139,50 @@
       wrapper.appendChild(gear);
       wrapper.appendChild(table);
       wrapper.appendChild(menu);
-      table.parentN
+      table.parentNode.insertBefore(wrapper, table);
+
+      gear.addEventListener('click', () => {
+        menu.innerHTML = '';
+        const headers = table.querySelectorAll('th');
+        headers.forEach((th, i) => {
+          const label = document.createElement('label');
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.checked = !th.classList.contains('hidden-column');
+          cb.addEventListener('change', () => toggleColumn(table, i));
+          label.append(cb, th.textContent);
+          menu.append(label);
+        });
+        menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+      });
+
+      document.addEventListener('click', (e) => {
+        if (!gear.contains(e.target) && !menu.contains(e.target)) {
+          menu.style.display = 'none';
+        }
+      });
+    }
+
+    function toggleColumn(table, i) {
+      table.querySelectorAll('tr').forEach(tr => {
+        const cell = tr.children[i];
+        if (cell) cell.classList.toggle('hidden-column');
+      });
+    }
+
+    // Attach to existing or future tables
+    const observer = new MutationObserver(() => {
+      document.querySelectorAll('#data-display-area table').forEach(table => {
+        if (!table.dataset.hasGear) {
+          addGearMenuToTable(table);
+          table.dataset.hasGear = true;
+        }
+      });
+    });
+
+    observer.observe(document.getElementById('data-display-area'), { childList: true, subtree: true });
+  </script>
+
+  <script src="script.js"></script>
+</body>
+</html>
