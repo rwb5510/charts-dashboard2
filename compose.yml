@@ -4,6 +4,9 @@ services:
   charts-dashboard: 
     image: ghcr.io/trucardiology/charts-dashboard2:latest
     container_name: charts-dashboard
-    ports: - "8087:3000"
-    environment: - NODE_ENV=production
-      - PORT=3000 # Add other env vars here, e.g. DB_URL, SECRET_KEY restart: unless-stopped
+    ports: 
+      - "8087:3000"
+
+environment: 
+  - NODE_ENV=production
+  - PORT=3000 # Add other env vars here, e.g. DB_URL, SECRET_KEY restart: unless-stopped
