@@ -1,30 +1,24 @@
 # --- Stage 1: Builder ---
-FROM node:20 AS builder
+FROM node:20-alpine AS builder
 WORKDIR /app
 
 COPY package*.json ./
-
-# Pass-through for missing lockfile
 ARG NO_LOCKFILE=false
 RUN if [ "$NO_LOCKFILE" = "true" ]; then npm install; else npm ci; fi
 
 COPY . .
-RUN npm run build || echo "No build script found — skipping."
 
 # --- Stage 2: Runtime ---
 FROM node:20-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Must redeclare the ARG for this stage
 ARG NO_LOCKFILE=false
 COPY package*.json ./
 RUN if [ "$NO_LOCKFILE" = "true" ]; then npm install --omit=dev; else npm ci --only=production; fi
 
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/server.js ./server.js
-COPY --from=builder /app/package*.json ./
+# Copy everything you actually need
+COPY --from=builder /app ./
 
 EXPOSE 3000
 CMD ["npm", "run", "start"]
