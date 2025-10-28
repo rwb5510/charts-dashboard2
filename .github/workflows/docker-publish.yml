@@ -38,4 +38,6 @@ jobs:
           tags: |
             ghcr.io/trucardiology/charts-dashboard2:latest
             ghcr.io/trucardiology/charts-dashboard2:${{ github.sha }}
+          build-args: |
+            NO_LOCKFILE=true
           platforms: linux/amd64
