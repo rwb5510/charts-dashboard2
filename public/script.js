@@ -1,3 +1,8 @@
+/**
+ * Main application entry point.
+ * This function is executed when the DOM is fully loaded.
+ * It initialises the application, sets up event listeners, and loads initial data.
+ */
 document.addEventListener('DOMContentLoaded', () => {
     // --- DOM Element References ---
     const uploadArea = document.getElementById('upload-area');
@@ -15,20 +20,60 @@ document.addEventListener('DOMContentLoaded', () => {
     const pdfModalCloseBtn = document.getElementById('pdf-modal-close-btn');
     const pdfIframe = document.getElementById('pdf-iframe');
 
+/**
+     * @typedef {Object} Patient
+     * @property {string} id - Unique identifier for the patient.
+     * @property {string} Visit Type - The type of visit.
+     * @property {string} Patient Name - The name of the patient.
+     * @property {string} Time - The time of the appointment.
+     * @property {string} Sex - The sex of the patient.
+     * @property {string} Age - The age of the patient.
+     * @property {string[]} Reason - An array of reasons for the visit.
+     * @property {Object[]} Results Needed - An array of objects representing results needed.
+     * @property {string} Results Needed.name - The name of the result needed.
+     * @property {boolean} Results Needed.completed - Whether the result is completed.
+     * @property {Object|null} Chart - An object representing an attached chart file.
+     * @property {string} Chart.name - The name of the chart file.
+     * @property {string} Chart.dataUrl - The data URL of the chart file.
+     * @property {Object|null} Extracted Summary - An object representing an attached summary file.
+     * @property {string} Extracted Summary.name - The name of the summary file.
+     * @property {string} Extracted Summary.dataUrl - The data URL of the summary file.
+     * @property {boolean} isPrinted - Whether the patient's chart has been printed.
+     * @property {boolean} isDone - Whether the patient's visit is done.
+     * @property {boolean} isCancelled - Whether the patient's visit is cancelled.
+     */
+    /**
+     * @typedef {Object.<string, Patient[]>} PatientLists
+     */
+    /**
+     * @typedef {Object} AppState
+     * @property {PatientLists} patientLists - A dictionary of patient lists, keyed by Date of Service (DOS).
+     * @property {Set<string>} reasonTags - A set of unique tags for visit reasons.
+     * @property {Set<string>} resultsNeededTags - A set of unique tags for results needed.
+     * @property {Set<string>} visitTypeTags - A set of unique tags for visit types.
+     * @property {string[]} columnOrder - The order of columns to display in the patient table.
+     * @property {Object[]|null} fileToProcess - Raw data from a file that is pending processing.
+     */
+
     // --- Application State ---
+    /** @type {AppState} */
     let appState = {
         patientLists: {}, // Keyed by DOS, e.g., { '2023-10-27': [...] }
         reasonTags: new Set(),
         resultsNeededTags: new Set(),
         visitTypeTags: new Set(),
-        columnOrder: [], 
+        columnOrder: [],
         fileToProcess: null
     };
     
     // --- Server API Configuration ---
     const API_ENDPOINT = '/api/state';
 
-    // --- Utility & Helper Functions ---
+/**
+     * Displays a notification message to the user.
+     * @param {string} message - The message to display.
+     * @param {'info' | 'success' | 'error'} [type='info'] - The type of notification.
+     */
     const showNotification = (message, type = 'info') => {
         try {
             const colors = {
@@ -46,6 +91,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+/**
+     * Saves the current application state to the server.
+     */
     const saveData = async () => {
         try {
             const payload = {
@@ -70,6 +118,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+/**
+     * Loads the application state from the server.
+     */
     const loadData = async () => {
         try {
             const response = await fetch(API_ENDPOINT);
@@ -111,6 +162,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+/**
+     * Normalizes a patient name to a consistent format (LASTNAME,FIRSTNAME).
+     * @param {string} name - The patient name to normalize.
+     * @returns {string} The normalized name.
+     */
     const normalizeName = (name) => {
         if (typeof name !== 'string' || !name) return '';
         const upperName = name.toUpperCase();
@@ -122,10 +178,29 @@ document.addEventListener('DOMContentLoaded', () => {
         return `${lastName},${firstName}`;
     };
 
-    // --- Data Formatting Functions ---
+/**
+     * Formats a time string by removing the leading zero.
+     * @param {string} time - The time string to format.
+     * @returns {string} The formatted time string.
+     */
     const formatTime = (time) => time && typeof time === 'string' ? time.replace(/^0/, '') : time;
+    /**
+     * Formats a sex string to a single uppercase character.
+     * @param {string} sex - The sex string to format.
+     * @returns {string} The formatted sex string.
+     */
     const formatSex = (sex) => sex && typeof sex === 'string' ? sex.charAt(0).toUpperCase() : sex;
+    /**
+     * Formats an age string by removing the " Y" suffix.
+     * @param {string} age - The age string to format.
+     * @returns {string} The formatted age string.
+     */
     const formatAge = (age) => age && typeof age === 'string' ? age.replace(/ Y$/, '') : age;
+    /**
+     * Formats a date of birth string to MM/DD/YYYY format.
+     * @param {string|number} dob - The date of birth to format.
+     * @returns {string} The formatted date of birth string.
+     */
     const formatDOB = (dob) => {
          if (!dob) return '';
         if (typeof dob === 'number') {
@@ -138,6 +213,11 @@ document.addEventListener('DOMContentLoaded', () => {
             return `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}/${date.getFullYear()}`;
         } catch (e) { return dob; }
     };
+    /**
+     * Formats a phone number to (XXX) XXX-XXXX format.
+     * @param {string} phone - The phone number to format.
+     * @returns {string} The formatted phone number.
+     */
     const formatPhone = (phone) => {
         if (!phone) return phone;
         const cleaned = ('' + phone).replace(/\D/g, '');
@@ -145,6 +225,11 @@ document.addEventListener('DOMContentLoaded', () => {
         return match ? `(${match[1]}) ${match[2]}-${match[3]}` : phone;
     };
     
+/**
+     * Converts a time string (e.g., "9:00 AM") to minutes from midnight.
+     * @param {string} timeStr - The time string to convert.
+     * @returns {number} The number of minutes from midnight.
+     */
     const timeStringToMinutes = (timeStr) => {
         if (!timeStr || typeof timeStr !== 'string') return 9999;
         const timeParts = timeStr.match(/(\d{1,2}):(\d{2})\s?(AM|PM)/i);
@@ -157,6 +242,11 @@ document.addEventListener('DOMContentLoaded', () => {
         return hour * 60 + minute;
     };
 
+/**
+     * Checks if a time string is outside of standard clinic hours or not on a standard 20-minute interval.
+     * @param {string} timeStr - The time string to check.
+     * @returns {boolean} True if the time is non-standard, false otherwise.
+     */
     const isNonStandardTime = (timeStr) => {
         if (!timeStr || typeof timeStr !== 'string') return false;
         const timeParts = timeStr.match(/(\d{1,2}):(\d{2})\s?(AM|PM)/i);
@@ -171,6 +261,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return false;
     };
 
+/**
+     * Generates an array of standard time slots for a clinic day.
+     * @returns {string[]} An array of time strings.
+     */
     const generateStandardTimeSlots = () => {
         const slots = [];
         for (let hour = 8; hour < 15; hour++) {
@@ -184,7 +278,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return slots;
     };
 
-    // --- Core Application Logic ---
+/**
+     * Handles a file upload, directing it to the appropriate processor based on file name.
+     * @param {File} file - The file to process.
+     */
     const handleFile = (file) => {
         try {
             const fileName = file.name.toLowerCase();
@@ -215,6 +312,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+/**
+     * Processes the primary patient list data from an "ovenctrs" file.
+     * @param {Object[]} data - The raw data from the XLSX file.
+     * @param {string} dos - The Date of Service for this patient list.
+     */
     const processPrimaryData = (data, dos) => {
         if (!data || data.length === 0) return;
         try {
@@ -253,6 +355,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
     
+/**
+     * Processes supplemental patient data and merges it into the existing patient lists.
+     * @param {Object[]} data - The raw data from the XLSX file.
+     */
     const processSupplementalData = (data) => {
         try {
             if (Object.keys(appState.patientLists).length === 0) { showNotification('Upload a primary list before supplemental data.', 'error'); return; }
@@ -296,6 +402,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+/**
+     * Updates a <datalist> element with a set of tags.
+     * @param {string} id - The ID of the datalist element.
+     * @param {Set<string>} tags - A set of tags to populate the datalist with.
+     */
     const updateDatalist = (id, tags) => {
         let datalist = document.getElementById(id);
         if (!datalist) {
@@ -307,6 +418,12 @@ document.addEventListener('DOMContentLoaded', () => {
         datalist.innerHTML = sortedTags.map(tag => `<option value="${tag}"></option>`).join('');
     };
 
+/**
+     * Creates a generic editable cell for the patient table.
+     * @param {Patient} patient - The patient object.
+     * @param {string} header - The key of the patient property this cell edits.
+     * @returns {HTMLDivElement} The created cell element.
+     */
     const createEditableCell = (patient, header) => {
         const cellContent = document.createElement('div');
         cellContent.contentEditable = true;
@@ -351,19 +468,28 @@ document.addEventListener('DOMContentLoaded', () => {
         return cellContent;
     };
 
-    // --- PDF Modal Functions ---
+/**
+     * Opens the PDF modal to display a file.
+     * @param {string} dataUrl - The data URL of the file to display.
+     * @param {string} fileName - The name of the file.
+     */
     const openPdfModal = (dataUrl, fileName) => {
         pdfModalTitle.textContent = fileName || 'PDF Viewer';
         pdfIframe.src = dataUrl;
         pdfModal.classList.remove('hidden');
     };
 
+    /**
+     * Closes the PDF modal.
+     */
     const closePdfModal = () => {
         pdfIframe.src = 'about:blank'; // Clear the iframe to stop loading
         pdfModal.classList.add('hidden');
     };
 
-    // --- Rendering Logic ---
+/**
+     * Renders the entire application based on the current appState.
+     */
     const renderApp = () => {
         const hasData = Object.keys(appState.patientLists).length > 0;
         uploadArea.classList.toggle('hidden', hasData);
@@ -545,6 +671,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
     
+/**
+     * Creates a cell for single-item selection with a datalist.
+     * @param {Patient} patient - The patient object.
+     * @param {string} key - The key of the patient property this cell edits.
+     * @param {string} datalistId - The ID of the datalist to use for suggestions.
+     * @param {Set<string>} tagSet - The set of tags to manage.
+     * @returns {HTMLInputElement} The created input element.
+     */
     const createSingleSelectCell = (patient, key, datalistId, tagSet) => {
         if (Array.isArray(patient[key])) {
             patient[key] = patient[key][0] || '';
@@ -567,6 +701,16 @@ document.addEventListener('DOMContentLoaded', () => {
         return input;
     };
     
+/**
+     * Creates a cell for multi-item selection with tags.
+     * @param {Patient} patient - The patient object.
+     * @param {string} key - The key of the patient property this cell edits.
+     * @param {string} datalistId - The ID of the datalist to use for suggestions.
+     * @param {Set<string>} tagSet - The set of tags to manage.
+     * @param {string} tagClasses - The CSS classes for the tags.
+     * @param {string} placeholder - The placeholder text for the input.
+     * @returns {HTMLDivElement} The created container element.
+     */
     const createInteractiveCell = (patient, key, datalistId, tagSet, tagClasses, placeholder) => {
         const container = document.createElement('div');
         container.className = 'flex flex-wrap gap-1 items-center';
@@ -614,6 +758,11 @@ document.addEventListener('DOMContentLoaded', () => {
         return container;
     };
 
+/**
+     * Creates a cell specifically for managing "Results Needed" items.
+     * @param {Patient} patient - The patient object.
+     * @returns {HTMLDivElement} The created container element.
+     */
     const createResultsNeededCell = (patient) => {
         if (patient['Results Needed'] && patient['Results Needed'].length > 0 && typeof patient['Results Needed'][0] === 'string') {
             patient['Results Needed'] = patient['Results Needed'].map(name => ({ name: name, completed: false }));
@@ -670,6 +819,14 @@ document.addEventListener('DOMContentLoaded', () => {
         return container;
     };
 
+/**
+     * Creates a cell for attaching files.
+     * @param {Patient} patient - The patient object.
+     * @param {string} key - The key of the patient property this cell edits.
+     * @param {string} acceptMime - The MIME types to accept.
+     * @param {string} acceptExtension - The file extensions to accept.
+     * @returns {HTMLDivElement} The created cell element.
+     */
     const createAttachmentCell = (patient, key, acceptMime, acceptExtension) => {
         const cell = document.createElement('div');
         cell.className = 'attachment-cell';
@@ -823,6 +980,9 @@ document.addEventListener('DOMContentLoaded', () => {
         return cell;
     };
 
+/**
+     * Sets up all the global event listeners for the application.
+     */
     const setupEventListeners = () => {
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
             uploadArea.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); }, false);
@@ -860,6 +1020,9 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     };
 
+/**
+     * Initialises the application.
+     */
     const init = async () => {
         try {
             await loadData();
