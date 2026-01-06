@@ -1,4 +1,4 @@
-# Charts Dashboard
+# Charts Dashboard2
 
 This is a simple web application that provides a dashboard for managing patient lists. It uses a Node.js backend with Express and a SQLite database for persistence.
 
