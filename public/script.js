@@ -786,7 +786,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 removeBtn.innerHTML = '&times;';
                 removeBtn.onclick = (e) => {
                     e.stopPropagation();
-                    patient['Results Needed'] = patient['ResultsNeeded'].filter(r => r.name !== item.name);
+                    patient['Results Needed'] = patient['Results Needed'].filter(r => r.name !== item.name);
                     saveData(); // This is now async
                     renderTags();
                 };
