@@ -1,4 +1,17 @@
-- name: Extract metadata for Docker
+name: Build and publish Docker image
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract metadata for Docker
         id: meta
         uses: docker/metadata-action@v5
         with:
