@@ -9,6 +9,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const fileInput = document.getElementById('file-input');
     const controlsArea = document.getElementById('controls-area');
     const uploadAnotherBtn = document.getElementById('upload-another-btn');
+    const togglePastDatesBtn = document.getElementById('toggle-past-dates-btn');
+    const filterDatesBtn = document.getElementById('filter-dates-btn');
     const dataDisplayArea = document.getElementById('data-display-area');
     const dosModal = document.getElementById('dos-modal');
     const dosInput = document.getElementById('dos-input');
@@ -19,6 +21,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const pdfModalTitle = document.getElementById('pdf-modal-title');
     const pdfModalCloseBtn = document.getElementById('pdf-modal-close-btn');
     const pdfIframe = document.getElementById('pdf-iframe');
+    const filterModal = document.getElementById('filter-modal');
+    const filterStartDate = document.getElementById('filter-start-date');
+    const filterEndDate = document.getElementById('filter-end-date');
+    const clearFilterBtn = document.getElementById('clear-filter-btn');
+    const applyFilterBtn = document.getElementById('apply-filter-btn');
+    const closeFilterModalBtn = document.getElementById('close-filter-modal-btn');
 
 /**
      * @typedef {Object} Patient
@@ -53,6 +61,10 @@ document.addEventListener('DOMContentLoaded', () => {
      * @property {Set<string>} visitTypeTags - A set of unique tags for visit types.
      * @property {string[]} columnOrder - The order of columns to display in the patient table.
      * @property {Object[]|null} fileToProcess - Raw data from a file that is pending processing.
+     * @property {boolean} hidePastDates - Whether to hide dates prior to the current date.
+     * @property {Object} dateFilter - Filter for dates.
+     * @property {string|null} dateFilter.start - Start date for filtering.
+     * @property {string|null} dateFilter.end - End date for filtering.
      */
 
     // --- Application State ---
@@ -63,7 +75,9 @@ document.addEventListener('DOMContentLoaded', () => {
         resultsNeededTags: new Set(),
         visitTypeTags: new Set(),
         columnOrder: [],
-        fileToProcess: null
+        fileToProcess: null,
+        hidePastDates: false,
+        dateFilter: { start: null, end: null }
     };
     
     // --- Server API Configuration ---
@@ -514,6 +528,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const sortedDOSKeys = Object.keys(appState.patientLists).sort((a, b) => new Date(b) - new Date(a));
         sortedDOSKeys.forEach(dos => {
+            // Filter logic
+            const dosDate = new Date(dos + 'T00:00:00');
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            if (appState.hidePastDates && dosDate < today) return;
+
+            if (appState.dateFilter.start) {
+                const startDate = new Date(appState.dateFilter.start + 'T00:00:00');
+                if (dosDate < startDate) return;
+            }
+            if (appState.dateFilter.end) {
+                const endDate = new Date(appState.dateFilter.end + 'T00:00:00');
+                if (dosDate > endDate) return;
+            }
+
             let patientList = appState.patientLists[dos];
             const timeCounts = {};
             patientList.forEach(p => { timeCounts[p.Time] = (timeCounts[p.Time] || 0) + 1; });
@@ -1017,7 +1047,44 @@ document.addEventListener('DOMContentLoaded', () => {
             if (e.target === pdfModal) {
                 closePdfModal();
             }
+            if (e.target === filterModal) {
+                filterModal.classList.add('hidden');
+            }
         };
+
+        // Date Filter Events
+        togglePastDatesBtn.addEventListener('click', () => {
+            appState.hidePastDates = !appState.hidePastDates;
+            togglePastDatesBtn.textContent = appState.hidePastDates ? 'Show Past Dates' : 'Hide Past Dates';
+            renderApp();
+        });
+
+        filterDatesBtn.addEventListener('click', () => {
+            filterStartDate.value = appState.dateFilter.start || '';
+            filterEndDate.value = appState.dateFilter.end || '';
+            filterModal.classList.remove('hidden');
+        });
+
+        closeFilterModalBtn.addEventListener('click', () => {
+            filterModal.classList.add('hidden');
+        });
+
+        clearFilterBtn.addEventListener('click', () => {
+            appState.dateFilter = { start: null, end: null };
+            filterStartDate.value = '';
+            filterEndDate.value = '';
+            filterModal.classList.add('hidden');
+            renderApp();
+        });
+
+        applyFilterBtn.addEventListener('click', () => {
+            appState.dateFilter = {
+                start: filterStartDate.value || null,
+                end: filterEndDate.value || null
+            };
+            filterModal.classList.add('hidden');
+            renderApp();
+        });
     };
 
 /**
