@@ -1,48 +1,47 @@
 const express = require('express');
 const path = require('path');
-const fs = require('fs');
-const sqlite3 = require('sqlite3');
-const { open } = require('sqlite');
+const { Pool } = require('pg');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const DATA_DIRECTORY = path.join(__dirname, 'data');
-const DATABASE_PATH = path.join(DATA_DIRECTORY, 'app.db');
 const PUBLIC_DIRECTORY = path.join(__dirname, 'public');
 
 app.use(express.json({ limit: '25mb' }));
 app.use(express.static(PUBLIC_DIRECTORY));
 
-let db;
+let pool;
 
 /**
- * Initialises the database by creating the data directory if it doesn't exist,
- * opening the database connection, and creating the necessary tables.
- * @returns {Promise<void>} A promise that resolves when the database is initialised.
+ * Initialises the database pool and creates necessary tables.
+ * @returns {Promise<void>}
  */
 async function initialiseDatabase() {
-    if (!fs.existsSync(DATA_DIRECTORY)) {
-        fs.mkdirSync(DATA_DIRECTORY, { recursive: true });
-    }
-
-    db = await open({
-        filename: DATABASE_PATH,
-        driver: sqlite3.Database,
+    pool = new Pool({
+        host: process.env.DB_HOST || 'localhost',
+        port: parseInt(process.env.DB_PORT || '5432', 10),
+        user: process.env.DB_USER || 'postgres',
+        password: process.env.DB_PASSWORD || 'password',
+        database: process.env.DB_NAME || 'charts_db',
     });
 
-    await db.exec(`
-        CREATE TABLE IF NOT EXISTS patient_lists (
-            dos TEXT PRIMARY KEY,
-            data TEXT NOT NULL
-        );
-    `);
+    const client = await pool.connect();
+    try {
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS patient_lists (
+                dos TEXT PRIMARY KEY,
+                data TEXT NOT NULL
+            );
+        `);
 
-    await db.exec(`
-        CREATE TABLE IF NOT EXISTS settings (
-            name TEXT PRIMARY KEY,
-            values_json TEXT NOT NULL
-        );
-    `);
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS settings (
+                name TEXT PRIMARY KEY,
+                values_json TEXT NOT NULL
+            );
+        `);
+    } finally {
+        client.release();
+    }
 }
 
 /**
@@ -50,8 +49,8 @@ async function initialiseDatabase() {
  * @returns {Promise<object>} A promise that resolves with the application state.
  */
 async function loadState() {
-    const patientRows = await db.all('SELECT dos, data FROM patient_lists ORDER BY dos');
-    const settingsRows = await db.all('SELECT name, values_json FROM settings');
+    const { rows: patientRows } = await pool.query('SELECT dos, data FROM patient_lists ORDER BY dos');
+    const { rows: settingsRows } = await pool.query('SELECT name, values_json FROM settings');
 
     const patientLists = {};
     for (const row of patientRows) {
@@ -84,11 +83,7 @@ async function loadState() {
 /**
  * Persists the application state to the database.
  * @param {object} state - The application state to persist.
- * @param {object} state.patientLists - A dictionary of patient lists, keyed by date of service.
- * @param {string[]} state.reasonTags - A list of reason tags.
- * @param {string[]} state.resultsNeededTags - A list of results needed tags.
- * @param {string[]} state.visitTypeTags - A list of visit type tags.
- * @returns {Promise<void>} A promise that resolves when the state has been persisted.
+ * @returns {Promise<void>}
  */
 async function persistState({ patientLists, reasonTags, resultsNeededTags, visitTypeTags }) {
     if (typeof patientLists !== 'object' || patientLists === null || Array.isArray(patientLists)) {
@@ -101,37 +96,33 @@ async function persistState({ patientLists, reasonTags, resultsNeededTags, visit
         ['visitTypeTags', Array.isArray(visitTypeTags) ? visitTypeTags : []],
     ];
 
-    await db.exec('BEGIN');
+    const client = await pool.connect();
     try {
-        await db.run('DELETE FROM patient_lists');
-        const insertPatient = await db.prepare('INSERT INTO patient_lists (dos, data) VALUES (?, ?)');
+        await client.query('BEGIN');
+
+        await client.query('DELETE FROM patient_lists');
+        const insertPatient = 'INSERT INTO patient_lists (dos, data) VALUES ($1, $2)';
         for (const [dos, patients] of Object.entries(patientLists)) {
-            await insertPatient.run(dos, JSON.stringify(Array.isArray(patients) ? patients : []));
+            await client.query(insertPatient, [dos, JSON.stringify(Array.isArray(patients) ? patients : [])]);
         }
-        await insertPatient.finalize();
 
-        await db.run('DELETE FROM settings');
-        const insertSetting = await db.prepare('INSERT INTO settings (name, values_json) VALUES (?, ?)');
+        await client.query('DELETE FROM settings');
+        const insertSetting = 'INSERT INTO settings (name, values_json) VALUES ($1, $2)';
         for (const [name, values] of serialisedSettings) {
-            await insertSetting.run(name, JSON.stringify(values));
+            await client.query(insertSetting, [name, JSON.stringify(values)]);
         }
-        await insertSetting.finalize();
 
-        await db.exec('COMMIT');
+        await client.query('COMMIT');
     } catch (error) {
-        await db.exec('ROLLBACK');
+        await client.query('ROLLBACK');
         throw error;
+    } finally {
+        client.release();
     }
 }
 
 /**
  * Route to get the current application state.
- * @name GET /api/state
- * @function
- * @memberof module:server
- * @inner
- * @param {object} req - Express request object.
- * @param {object} res - Express response object.
  */
 app.get('/api/state', async (req, res) => {
     try {
@@ -145,12 +136,6 @@ app.get('/api/state', async (req, res) => {
 
 /**
  * Route to save the application state.
- * @name POST /api/state
- * @function
- * @memberof module:server
- * @inner
- * @param {object} req - Express request object.
- * @param {object} res - Express response object.
  */
 app.post('/api/state', async (req, res) => {
     try {
@@ -165,13 +150,6 @@ app.post('/api/state', async (req, res) => {
 
 /**
  * Catch-all route to serve the main index.html file for any non-API routes.
- * @name GET *
- * @function
- * @memberof module:server
- * @inner
- * @param {object} req - Express request object.
- * @param {object} res - Express response object.
- * @param {function} next - Express next middleware function.
  */
 app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api/')) {
@@ -180,6 +158,9 @@ app.get('*', (req, res, next) => {
     res.sendFile(path.join(PUBLIC_DIRECTORY, 'index.html'));
 });
 
+// Start the server only after ensuring DB connection logic is set up.
+// Note: We might want a retry logic here for container startup timing,
+// but Docker 'restart: always' or 'depends_on' helps.
 initialiseDatabase()
     .then(() => {
         app.listen(PORT, () => {
@@ -187,6 +168,6 @@ initialiseDatabase()
         });
     })
     .catch((error) => {
-        console.error('Failed to start server:', error);
+        console.error('Failed to start server/database:', error);
         process.exit(1);
     });
