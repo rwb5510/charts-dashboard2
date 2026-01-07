@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const fileInput = document.getElementById('file-input');
     const controlsArea = document.getElementById('controls-area');
     const uploadAnotherBtn = document.getElementById('upload-another-btn');
+    const toggleVisibilityBtn = document.getElementById('toggle-visibility-btn');
     const dataDisplayArea = document.getElementById('data-display-area');
     const dosModal = document.getElementById('dos-modal');
     const dosInput = document.getElementById('dos-input');
@@ -63,7 +64,8 @@ document.addEventListener('DOMContentLoaded', () => {
         resultsNeededTags: new Set(),
         visitTypeTags: new Set(),
         columnOrder: [],
-        fileToProcess: null
+        fileToProcess: null,
+        showCancelledAndEmpty: true
     };
     
     // --- Server API Configuration ---
@@ -494,6 +496,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const hasData = Object.keys(appState.patientLists).length > 0;
         uploadArea.classList.toggle('hidden', hasData);
         controlsArea.classList.toggle('hidden', !hasData);
+
+        toggleVisibilityBtn.textContent = appState.showCancelledAndEmpty
+            ? 'Hide Cancelled & Empty'
+            : 'Show Cancelled & Empty';
+
         dataDisplayArea.innerHTML = '';
         if (!hasData) return;
 
@@ -523,6 +530,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const emptySlots = standardSlots.filter(slot => !existingTimes.has(slot));
             const placeholderRows = emptySlots.map(time => ({ id: `empty-${dos}-${time}`, Time: time, isEmptySlot: true }));
             let displayList = [...patientList, ...placeholderRows];
+
+            if (!appState.showCancelledAndEmpty) {
+                displayList = displayList.filter(p => !p.isCancelled && !p.isEmptySlot);
+            }
+
             displayList.sort((a, b) => timeStringToMinutes(a.Time) - timeStringToMinutes(b.Time));
             const dosContainer = document.createElement('details');
             dosContainer.className = 'bg-white rounded-lg shadow overflow-hidden';
@@ -996,6 +1008,10 @@ document.addEventListener('DOMContentLoaded', () => {
         uploadArea.addEventListener('drop', e => { for (const file of e.dataTransfer.files) handleFile(file); }, false);
         uploadArea.addEventListener('click', () => fileInput.click());
         uploadAnotherBtn.addEventListener('click', () => fileInput.click());
+        toggleVisibilityBtn.addEventListener('click', () => {
+            appState.showCancelledAndEmpty = !appState.showCancelledAndEmpty;
+            renderApp();
+        });
         fileInput.addEventListener('change', e => {
             for (const file of e.target.files) {
                 handleFile(file);
