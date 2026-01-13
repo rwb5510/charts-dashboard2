@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const dosModal = document.getElementById('dos-modal');
     const dosInput = document.getElementById('dos-input');
     const submitDosBtn = document.getElementById('submit-dos-btn');
+    const slotDurationInput = document.getElementById('slot-duration-input');
     const notificationContainer = document.getElementById('notification-container');
     const pdfModal = document.getElementById('pdf-modal');
     const pdfModalContent = document.getElementById('pdf-modal-content');
@@ -49,6 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
     /**
      * @typedef {Object} AppState
      * @property {PatientLists} patientLists - A dictionary of patient lists, keyed by Date of Service (DOS).
+     * @property {Object.<string, number>} slotDurations - A dictionary of slot durations, keyed by DOS.
      * @property {Set<string>} reasonTags - A set of unique tags for visit reasons.
      * @property {Set<string>} resultsNeededTags - A set of unique tags for results needed.
      * @property {Set<string>} visitTypeTags - A set of unique tags for visit types.
@@ -60,6 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
     /** @type {AppState} */
     let appState = {
         patientLists: {}, // Keyed by DOS, e.g., { '2023-10-27': [...] }
+        slotDurations: {}, // Keyed by DOS, e.g., { '2023-10-27': 20 }
         reasonTags: new Set(),
         resultsNeededTags: new Set(),
         visitTypeTags: new Set(),
@@ -100,6 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const payload = {
                 patientLists: appState.patientLists,
+                slotDurations: appState.slotDurations,
                 reasonTags: Array.from(appState.reasonTags),
                 resultsNeededTags: Array.from(appState.resultsNeededTags),
                 visitTypeTags: Array.from(appState.visitTypeTags),
@@ -136,6 +140,7 @@ document.addEventListener('DOMContentLoaded', () => {
             appState.patientLists = data.patientLists || {};
 
             // Load App Settings
+            appState.slotDurations = data.slotDurations || {};
             appState.reasonTags = new Set(data.reasonTags || []);
             appState.resultsNeededTags = new Set(data.resultsNeededTags || []);
             appState.visitTypeTags = new Set(data.visitTypeTags || []);
@@ -245,11 +250,12 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
 /**
-     * Checks if a time string is outside of standard clinic hours or not on a standard 20-minute interval.
+     * Checks if a time string is outside of standard clinic hours or not on a standard interval.
      * @param {string} timeStr - The time string to check.
+     * @param {number} [interval=20] - The slot duration interval (20 or 30).
      * @returns {boolean} True if the time is non-standard, false otherwise.
      */
-    const isNonStandardTime = (timeStr) => {
+    const isNonStandardTime = (timeStr, interval = 20) => {
         if (!timeStr || typeof timeStr !== 'string') return false;
         const timeParts = timeStr.match(/(\d{1,2}):(\d{2})\s?(AM|PM)/i);
         if (!timeParts) return true;
@@ -259,18 +265,33 @@ document.addEventListener('DOMContentLoaded', () => {
         if (ampm.toUpperCase() === 'PM' && hour !== 12) hour += 12;
         if (ampm.toUpperCase() === 'AM' && hour === 12) hour = 0;
         if (hour < 8 || hour >= 15) return true;
-        if (![0, 20, 40].includes(minute)) return true;
+
+        let validMinutes = [];
+        if (interval === 30) {
+             validMinutes = [0, 30];
+        } else {
+             validMinutes = [0, 20, 40];
+        }
+        if (!validMinutes.includes(minute)) return true;
         return false;
     };
 
 /**
      * Generates an array of standard time slots for a clinic day.
+     * @param {number} [interval=20] - The slot duration interval (20 or 30).
      * @returns {string[]} An array of time strings.
      */
-    const generateStandardTimeSlots = () => {
+    const generateStandardTimeSlots = (interval = 20) => {
         const slots = [];
         for (let hour = 8; hour < 15; hour++) {
-            for (let minute of [0, 20, 40]) {
+            let minutes = [];
+            if (interval === 30) {
+                 minutes = [0, 30];
+            } else {
+                 minutes = [0, 20, 40];
+            }
+
+            for (let minute of minutes) {
                  if (hour === 15 && minute > 0) continue;
                 const d = new Date(2000, 0, 1, hour, minute);
                 slots.push(d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).replace(/^0/, ''));
@@ -297,6 +318,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (fileName.includes('ovenctrs')) {
                         appState.fileToProcess = jsonData;
                         dosInput.value = '';
+                        slotDurationInput.value = '20'; // Reset to default
                         dosModal.classList.remove('hidden');
                     } else if (fileName.includes('registry_report') || fileName.includes('cwreport')) {
                         processSupplementalData(jsonData);
@@ -318,10 +340,12 @@ document.addEventListener('DOMContentLoaded', () => {
      * Processes the primary patient list data from an "ovenctrs" file.
      * @param {Object[]} data - The raw data from the XLSX file.
      * @param {string} dos - The Date of Service for this patient list.
+     * @param {number} duration - The selected slot duration.
      */
-    const processPrimaryData = (data, dos) => {
+    const processPrimaryData = (data, dos, duration) => {
         if (!data || data.length === 0) return;
         try {
+            appState.slotDurations[dos] = duration;
             const visitStsIndex = Object.keys(data[0]).indexOf('Visit Sts');
             const columnsToRemove = visitStsIndex !== -1 ? Object.keys(data[0]).slice(visitStsIndex) : [];
             columnsToRemove.push('P/R', 'Provider', 'Appt Time');
@@ -522,10 +546,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const sortedDOSKeys = Object.keys(appState.patientLists).sort((a, b) => new Date(b) - new Date(a));
         sortedDOSKeys.forEach(dos => {
             let patientList = appState.patientLists[dos];
+            const duration = appState.slotDurations[dos] || 20;
             const timeCounts = {};
             patientList.forEach(p => { timeCounts[p.Time] = (timeCounts[p.Time] || 0) + 1; });
             patientList.forEach(p => { p.isDoubleBooked = timeCounts[p.Time] > 1; });
-            const standardSlots = generateStandardTimeSlots();
+            const standardSlots = generateStandardTimeSlots(duration);
             const existingTimes = new Set(patientList.map(p => p.Time));
             const emptySlots = standardSlots.filter(slot => !existingTimes.has(slot));
             const placeholderRows = emptySlots.map(time => ({ id: `empty-${dos}-${time}`, Time: time, isEmptySlot: true }));
@@ -664,7 +689,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             cell.appendChild(createAttachmentCell(patient, 'Extracted Summary', 'application/pdf,text/html', '.pdf,.html'));
                         } else {
                             const editableCell = createEditableCell(patient, header);
-                            if (header === 'Time' && (isNonStandardTime(patient[header]) || patient.isDoubleBooked)) {
+                            if (header === 'Time' && (isNonStandardTime(patient[header], duration) || patient.isDoubleBooked)) {
                                 editableCell.classList.add('font-bold', 'text-gray-900');
                             }
                             cell.appendChild(editableCell);
@@ -1020,9 +1045,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         submitDosBtn.addEventListener('click', () => {
             const dos = dosInput.value;
+            const duration = parseInt(slotDurationInput.value, 10) || 20;
             if (!dos) { showNotification('Please select a Date of Service.', 'error'); return; }
             dosModal.classList.add('hidden');
-            processPrimaryData(appState.fileToProcess, dos);
+            processPrimaryData(appState.fileToProcess, dos, duration);
             appState.fileToProcess = null;
         });
 
