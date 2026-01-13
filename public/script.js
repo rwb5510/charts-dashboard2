@@ -1105,7 +1105,6 @@ document.addEventListener('DOMContentLoaded', () => {
         togglePastDatesBtn.addEventListener('click', () => {
             appState.hidePastDates = !appState.hidePastDates;
             togglePastDatesBtn.textContent = appState.hidePastDates ? 'Show Past Dates' : 'Hide Past Dates';
-            saveData();
             renderApp();
         });
 
@@ -1124,7 +1123,6 @@ document.addEventListener('DOMContentLoaded', () => {
             filterStartDate.value = '';
             filterEndDate.value = '';
             filterModal.classList.add('hidden');
-            saveData();
             renderApp();
         });
 
@@ -1134,7 +1132,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 end: filterEndDate.value || null
             };
             filterModal.classList.add('hidden');
-            saveData();
             renderApp();
         });
     };
