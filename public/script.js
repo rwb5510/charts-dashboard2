@@ -115,6 +115,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 reasonTags: Array.from(appState.reasonTags),
                 resultsNeededTags: Array.from(appState.resultsNeededTags),
                 visitTypeTags: Array.from(appState.visitTypeTags),
+                hidePastDates: appState.hidePastDates,
+                dateFilter: appState.dateFilter,
             };
 
             const response = await fetch(API_ENDPOINT, {
@@ -151,6 +153,15 @@ document.addEventListener('DOMContentLoaded', () => {
             appState.reasonTags = new Set(data.reasonTags || []);
             appState.resultsNeededTags = new Set(data.resultsNeededTags || []);
             appState.visitTypeTags = new Set(data.visitTypeTags || []);
+            if (data.hasOwnProperty('hidePastDates')) {
+                appState.hidePastDates = data.hidePastDates;
+                if (togglePastDatesBtn) {
+                     togglePastDatesBtn.textContent = appState.hidePastDates ? 'Show Past Dates' : 'Hide Past Dates';
+                }
+            }
+            if (data.hasOwnProperty('dateFilter')) {
+                appState.dateFilter = data.dateFilter;
+            }
 
             // Data cleanup (from old localStorage versions)
             Object.values(appState.patientLists).forEach(list => {
@@ -1056,6 +1067,7 @@ document.addEventListener('DOMContentLoaded', () => {
         togglePastDatesBtn.addEventListener('click', () => {
             appState.hidePastDates = !appState.hidePastDates;
             togglePastDatesBtn.textContent = appState.hidePastDates ? 'Show Past Dates' : 'Hide Past Dates';
+            saveData();
             renderApp();
         });
 
@@ -1074,6 +1086,7 @@ document.addEventListener('DOMContentLoaded', () => {
             filterStartDate.value = '';
             filterEndDate.value = '';
             filterModal.classList.add('hidden');
+            saveData();
             renderApp();
         });
 
@@ -1083,6 +1096,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 end: filterEndDate.value || null
             };
             filterModal.classList.add('hidden');
+            saveData();
             renderApp();
         });
     };
