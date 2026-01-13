@@ -77,6 +77,7 @@ async function loadState() {
         reasonTags: settings.reasonTags || [],
         resultsNeededTags: settings.resultsNeededTags || [],
         visitTypeTags: settings.visitTypeTags || [],
+        slotDurations: settings.slotDurations || {},
     };
 }
 
@@ -85,7 +86,7 @@ async function loadState() {
  * @param {object} state - The application state to persist.
  * @returns {Promise<void>}
  */
-async function persistState({ patientLists, reasonTags, resultsNeededTags, visitTypeTags }) {
+async function persistState({ patientLists, reasonTags, resultsNeededTags, visitTypeTags, slotDurations }) {
     if (typeof patientLists !== 'object' || patientLists === null || Array.isArray(patientLists)) {
         throw new Error('Invalid patientLists payload');
     }
@@ -94,6 +95,7 @@ async function persistState({ patientLists, reasonTags, resultsNeededTags, visit
         ['reasonTags', Array.isArray(reasonTags) ? reasonTags : []],
         ['resultsNeededTags', Array.isArray(resultsNeededTags) ? resultsNeededTags : []],
         ['visitTypeTags', Array.isArray(visitTypeTags) ? visitTypeTags : []],
+        ['slotDurations', (slotDurations && typeof slotDurations === 'object') ? slotDurations : {}],
     ];
 
     const client = await pool.connect();
